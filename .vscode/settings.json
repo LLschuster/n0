@@ -1,0 +1,15 @@
+{
+    "files.associations": {
+        "functional": "cpp",
+        "xutility": "cpp",
+        "system_error": "cpp",
+        "type_traits": "cpp",
+        "xlocmon": "cpp",
+        "xtr1common": "cpp",
+        "algorithm": "cpp",
+        "chrono": "cpp",
+        "map": "cpp",
+        "xhash": "cpp",
+        "xtree": "cpp"
+    }
+}
