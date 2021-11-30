@@ -153,7 +153,7 @@ namespace ng
             font = TTF_OpenFont(font_path, FONT_SIZE_PIXEL);
             if (font == NULL)
             {
-                printf("Cant load font %s", font_path);
+                printf("Cant load font %s\n", font_path);
                 return 1;
             }
 
@@ -171,6 +171,12 @@ namespace ng
                 font,
                 text,
                 fontColor);
+
+            if (surface == NULL)
+            {
+                printf("Cant create surface texture ERROR: %s\n", TTF_GetError());
+                return;
+            }
 
             texture = SDL_CreateTextureFromSurface(renderer, surface);
 
@@ -204,6 +210,30 @@ namespace ng
             return 0;
         }
         void shutdown() {}
+    };
+
+    struct Frame
+    {
+        float width;
+        float height;
+        std::string src;
+        void operator=(Frame &other)
+        {
+            width = other.width;
+            height = other.height;
+            src = std::string(other.src);
+        }
+    };
+
+    struct Sprite
+    {
+        Frame frames[MAX_FRAMES_PER_SPRITE];
+        std::string label;
+        float width;
+        float height;
+        uint32 frameCount;
+        uint32 slowdown;
+        char *color; //TODO add color type
     };
 
     class Entity
@@ -286,32 +316,15 @@ namespace ng
         gameMemory->worldEntityList.entityIndex++;
     }
 
-    struct Frame
-    {
-        float width;
-        float height;
-        std::string src;
-    };
-
-    struct Sprite
-    {
-        Frame frames[MAX_FRAMES_PER_SPRITE];
-        std::string label;
-        float width;
-        float height;
-        uint32 frameCount;
-        uint32 slowdown;
-        char *color; //TODO add color type
-    };
-
     void
-    drawFrames(Renderer *renderer, Frame *frames, Vector2d *positions, uint32 count)
+    drawFrames(Renderer *renderer, Entity *entities, uint32 count)
     {
         for (uint32 i = 0; i < count; i++)
         {
             // offset because we draw with position as the middle point
-            Frame frameToDraw = frames[i];
-            Vector2d posToDraw = positions[i];
+            Entity current = entities[i];
+            Frame frameToDraw = current.sprite.frames[0];
+            Vector2d posToDraw = current.pos;
 
             float offsetX = frameToDraw.width / 2;
             float offsetY = frameToDraw.height / 2;

@@ -24,14 +24,49 @@ typedef uint8_t uint8;
 #include "ng_math.cpp"
 #include "engine.cpp"
 
+void generateWorld()
+{
+    ng::Sprite enemySprite = ng::loadSprite("EnemySprite.txt", "enemy");
+    ng::Randomizer xGenerator = {};
+    ng::Randomizer yGenerator = {};
+    xGenerator = ng::getRandomReal((float)SCREEN_WIDTH * 0.3, (float)SCREEN_WIDTH * 0.4f);
+    yGenerator = ng::getRandomReal(0.0f, (float)SCREEN_HEIGHT * 0.5f);
+    for (int i = 0; i < 10; i++)
+    {
+        float x = xGenerator.distribution.realD(xGenerator.generator);
+        float y = yGenerator.distribution.realD(yGenerator.generator);
+        float newXLow = x + enemySprite.width * ng::FONT_SIZE_PIXEL;
+        xGenerator = ng::getRandomReal(newXLow, newXLow * 1.2);
+
+        ng::addEntityToWorld("enemy", ng::Vector2d(x, y), enemySprite);
+    }
+
+    xGenerator = ng::getRandomReal((float)SCREEN_WIDTH * 0.3, (float)SCREEN_WIDTH * 0.4f);
+    yGenerator = ng::getRandomReal((float)SCREEN_HEIGHT * 0.5f, (float)SCREEN_HEIGHT);
+    for (int i = 0; i < 10; i++)
+    {
+        float x = xGenerator.distribution.realD(xGenerator.generator);
+        float y = yGenerator.distribution.realD(yGenerator.generator);
+        float newXLow = x + enemySprite.width * ng::FONT_SIZE_PIXEL;
+        xGenerator = ng::getRandomReal(newXLow, newXLow * 1.2);
+
+        ng::addEntityToWorld("enemy", ng::Vector2d(x, y), enemySprite);
+    }
+}
+
 int main(int argc, char **argv)
 {
-    lg->startup();
-    rd->startup();
+    int initResult = 0;
+    initResult += lg->startup();
+    initResult += rd->startup();
 
-    lg->writeLog("%s number: %d", "test logger", 5);
+    if (initResult > 0)
+    {
+        lg->writeLog("Systems initialization failed");
+        exit(initResult);
+    }
 
-// TODO move to gameManager
+    // TODO move to gameManager
     bool isRunning = true;
 
     size_t memorySize = megabyte(128);
@@ -45,32 +80,21 @@ int main(int argc, char **argv)
     ng::gameMemory->size = memorySize;
     ng::gameMemory->isInit = true;
 
-    ng::Sprite enemySprite = ng::loadSprite("EnemySprite.txt", "enemy");
-    for (int i = 0; i < 20; i++)
-    {
-        ng::addEntityToWorld("enemy", ng::Vector2d(i * 2, i * 3));
-    }
-
-    ng::QueryEntitiesResult batmanList = ng::getEntitiesByType("batman");
-
-    ng::Vector2d framePos = ng::Vector2d(10.0f, 20.0f);
-    ng::Vector2d framePos2 = ng::Vector2d(26.0f, 20.0f);
-    ng::Vector2d framePos3 = ng::Vector2d(200.0f, 20.0f);
-    ng::Vector2d framePos4 = ng::Vector2d(200.0f, 120.0f);
-    ng::Vector2d framePos5 = ng::Vector2d(200.0f, 220.0f);
-    ng::Vector2d positions[] = {framePos, framePos2, framePos3, framePos4, framePos5};
-
-
+    generateWorld();
 
     while (isRunning)
     {
         SDL_RenderClear(rd->renderer);
 
-        ng::drawFrames(rd, enemySprite.frames, positions, enemySprite.frameCount);
+        ng::QueryEntitiesResult enemyList = ng::getEntitiesByType("enemy");
+        ng::drawFrames(rd, *enemyList.entities, enemyList.count);
 
         SDL_RenderPresent(rd->renderer);
         SDL_Delay(33);
     }
+
+    lg->shutdown();
+    rd->shutdown();
 
     free(ng::gameMemory);
 
