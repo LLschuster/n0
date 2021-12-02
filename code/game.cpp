@@ -16,6 +16,7 @@ typedef uint8_t uint8;
 #define megabyte(value) ((value) * (1024) * (1024))
 #define lg ng::Logger::getInstance()
 #define rd ng::Renderer::getInstance()
+#define gm ng::GameManager::getInstance()
 #define SCREEN_HEIGHT 780
 #define SCREEN_WIDTH 1280
 
@@ -27,6 +28,10 @@ typedef uint8_t uint8;
 void generateWorld()
 {
     ng::Sprite enemySprite = ng::loadSprite("EnemySprite.txt", "enemy");
+    ng::Sprite heroSprite = ng::loadSprite("heroSprite.txt", "hero");
+
+    ng::addHeroToWorld(ng::Vector2d(20, SCREEN_HEIGHT / 2), heroSprite);
+
     ng::Randomizer xGenerator = {};
     ng::Randomizer yGenerator = {};
     xGenerator = ng::getRandomReal((float)SCREEN_WIDTH * 0.3, (float)SCREEN_WIDTH * 0.4f);
@@ -54,20 +59,53 @@ void generateWorld()
     }
 }
 
+void handleEvents()
+{
+    SDL_Event event;
+    while (SDL_PollEvent(&event))
+    {
+        switch (event.type)
+        {
+        case SDL_KEYDOWN:
+            if (event.key.state == SDL_PRESSED)
+            {
+                if (event.key.keysym.scancode == SDL_SCANCODE_Q)
+                {
+                    gm->terminateGame();
+                }
+                if (event.key.keysym.scancode == SDL_SCANCODE_UP)
+                {
+                    ng::movePlayer(ng::MoveDirection::UP);
+                }
+                if (event.key.keysym.scancode == SDL_SCANCODE_DOWN)
+                {
+                    ng::movePlayer(ng::MoveDirection::DOWN);
+                }
+                if (event.key.keysym.scancode == SDL_SCANCODE_LEFT)
+                {
+                    ng::movePlayer(ng::MoveDirection::LEFT);
+                }
+                if (event.key.keysym.scancode == SDL_SCANCODE_RIGHT)
+                {
+                    ng::movePlayer(ng::MoveDirection::RIGHT);
+                }
+            }
+        }
+    }
+}
+
 int main(int argc, char **argv)
 {
     int initResult = 0;
     initResult += lg->startup();
     initResult += rd->startup();
+    initResult += gm->startup();
 
     if (initResult > 0)
     {
         lg->writeLog("Systems initialization failed");
         exit(initResult);
     }
-
-    // TODO move to gameManager
-    bool isRunning = true;
 
     size_t memorySize = megabyte(128);
     ng::gameMemory = (ng::GameMemory *)malloc(memorySize);
@@ -82,19 +120,27 @@ int main(int argc, char **argv)
 
     generateWorld();
 
-    while (isRunning)
+    while (gm->isRunning)
     {
         SDL_RenderClear(rd->renderer);
+
+        //update
+        handleEvents();
 
         ng::QueryEntitiesResult enemyList = ng::getEntitiesByType("enemy");
         ng::drawFrames(rd, *enemyList.entities, enemyList.count);
 
+        //draw hero
+        ng::drawFrames(rd, ng::gameMemory->hero, 1);
+
         SDL_RenderPresent(rd->renderer);
-        SDL_Delay(33);
+        //TODO should run atleast in 33 ms
+        SDL_Delay(16);
     }
 
     lg->shutdown();
     rd->shutdown();
+    gm->shutdown();
 
     free(ng::gameMemory);
 

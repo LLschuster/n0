@@ -8,6 +8,14 @@ namespace ng
     static const uint32 FONT_SIZE_PIXEL = 16;
     static const char *DATA_PATH = "..//data//";
 
+    enum MoveDirection
+    {
+        UP,
+        DOWN,
+        LEFT,
+        RIGHT,
+    };
+
     class EngineSystem
     {
         std::string type;
@@ -212,6 +220,37 @@ namespace ng
         void shutdown() {}
     };
 
+    class GameManager : public EngineSystem
+    {
+    public:
+        bool isRunning;
+        GameManager() {}
+        ~GameManager() {}
+
+        static GameManager *getInstance()
+        {
+            static GameManager *instance = nullptr;
+            if (!instance)
+            {
+                instance = new GameManager();
+            }
+            return instance;
+        }
+        uint32 startup()
+        {
+            isRunning = true;
+            return 0;
+        }
+        void shutdown()
+        {
+        }
+
+        void terminateGame()
+        {
+            isRunning = false;
+        }
+    };
+
     struct Frame
     {
         float width;
@@ -229,8 +268,8 @@ namespace ng
     {
         Frame frames[MAX_FRAMES_PER_SPRITE];
         std::string label;
-        float width;
-        float height;
+        uint32 width;
+        uint32 height;
         uint32 frameCount;
         uint32 slowdown;
         char *color; //TODO add color type
@@ -241,8 +280,9 @@ namespace ng
     public:
         std::string type;
         Vector2d pos;
+        Vector2d velocity;
         Sprite sprite;
-        Entity(std::string _type, Vector2d _pos) : type(_type), pos(_pos){};
+        Entity(std::string _type, Vector2d _pos, Vector2d _velocity) : type(_type), pos(_pos), velocity(_velocity){};
         Entity(){};
     };
 
@@ -257,6 +297,7 @@ namespace ng
         WorldEntityList worldEntityList;
         uint8 workingMemory[MAX_WORKING_MEMORY];
         uint8 *workingMemoryCur = nullptr;
+        Entity *hero = nullptr;
         bool isInit = false;
         size_t size;
     };
@@ -302,18 +343,55 @@ namespace ng
         return result;
     }
 
-    void addEntityToWorld(const std::string &type, Vector2d pos, Sprite sprite)
+    uint32 addEntityToWorld(const std::string &type, Vector2d pos, Sprite sprite, Vector2d velocity = Vector2d(10.0f, 10.0f))
     {
         if (!gameMemory->isInit)
         {
-            return;
+            return 0;
         }
 
-        Entity *current = &(gameMemory->worldEntityList.entities[gameMemory->worldEntityList.entityIndex]);
+        uint32 currentIndex = gameMemory->worldEntityList.entityIndex;
+        Entity *current = &(gameMemory->worldEntityList.entities[currentIndex]);
         current->pos = pos;
         current->type = std::string(type);
         current->sprite = sprite;
+        current->velocity = velocity;
         gameMemory->worldEntityList.entityIndex++;
+        return currentIndex;
+    }
+
+    void addHeroToWorld(Vector2d pos, Sprite sprite)
+    {
+        uint32 heroIndex = addEntityToWorld("hero", pos, sprite, Vector2d(20.0f, 20.0f));
+        gameMemory->hero = &(gameMemory->worldEntityList.entities[heroIndex]);
+    }
+
+    void movePlayer(MoveDirection move)
+    {
+        Entity *hero = gameMemory->hero;
+        switch (move)
+        {
+        case MoveDirection::UP:
+            if ((hero->pos.y - (hero->sprite.height / 2) * FONT_SIZE_PIXEL) <= 0)
+                return;
+            hero->pos.y -= hero->velocity.y;
+            break;
+        case MoveDirection::DOWN:
+            if ((hero->pos.y + (hero->sprite.height / 2) * FONT_SIZE_PIXEL) >= SCREEN_HEIGHT)
+                return;
+            hero->pos.y += hero->velocity.y;
+            break;
+        case MoveDirection::LEFT:
+            if ((hero->pos.x - (hero->sprite.width / 2) * FONT_SIZE_PIXEL) <= 0)
+                return;
+            hero->pos.x -= hero->velocity.x;
+            break;
+        case MoveDirection::RIGHT:
+            if ((hero->pos.x + (hero->sprite.width / 2) * FONT_SIZE_PIXEL) >= SCREEN_WIDTH)
+                return;
+            hero->pos.x += hero->velocity.x;
+            break;
+        }
     }
 
     void
@@ -336,10 +414,9 @@ namespace ng
             {
                 for (uint32 x = 0; x < frameToDraw.width; x++)
                 {
-                    // printf("draw this %c stuff at (%f, %f) \n", frameToDraw.src[y * frameToDraw.width + x], posToDraw.x - offsetX + x, posToDraw.y - offsetY + y);
                     line[x] = frameToDraw.src[y * frameToDraw.width + x];
                 }
-                renderer->drawText(Vector2d(posToDraw.x - offsetX, posToDraw.y - offsetY + (y * FONT_SIZE_PIXEL)), FONT_SIZE_PIXEL, line);
+                renderer->drawText(Vector2d(posToDraw.x - offsetX, posToDraw.y - ((offsetY - y) * FONT_SIZE_PIXEL)), FONT_SIZE_PIXEL, line);
             }
         }
     }
@@ -435,7 +512,11 @@ namespace ng
                 }
                 else
                 {
-                    line[strlen(line) - 1] = '\0';
+                    for (size_t s = strlen(line) - 1; s < sprite.width; s++)
+                    {
+                        line[s] = ' ';
+                    }
+                    line[sprite.width] = '\0';
                     frameSrc += line;
                 }
                 if (strstr(line, "</BODY>"))
