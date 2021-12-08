@@ -16,6 +16,15 @@ namespace ng
         RIGHT,
     };
 
+    namespace EntityTypes
+    {
+        const char hero[] = "hero";
+        const char enemy[] = "enemy";
+        const char enemyInactive[] = "enemyInactive";
+        const char missile[] = "missile";
+        const char missileInactive[] = "missileInactive";
+    };
+
     class EngineSystem
     {
         std::string type;
@@ -310,6 +319,7 @@ namespace ng
 
     GameMemory *gameMemory = {};
 
+// TODO should return index to current working memory so i can free it
     QueryEntitiesResult getEntitiesByType(const std::string &type)
     {
         QueryEntitiesResult result = {};
@@ -366,6 +376,14 @@ namespace ng
         gameMemory->hero = &(gameMemory->worldEntityList.entities[heroIndex]);
     }
 
+    void launchMissile(Entity *missile)
+    {
+        Entity *hero = gameMemory->hero;
+        missile->pos.x = hero->pos.x;
+        missile->pos.y = hero->pos.y;
+        missile->type = EntityTypes::missile;
+    }
+
     void movePlayer(MoveDirection move)
     {
         Entity *hero = gameMemory->hero;
@@ -394,9 +412,61 @@ namespace ng
         }
     }
 
+    void moveEnemies()
+    {
+        QueryEntitiesResult enemyList = getEntitiesByType("enemy");
+        for (int i = 0; i < enemyList.count; i++)
+        {
+            enemyList.entities[i]->pos.x -= enemyList.entities[i]->velocity.x;
+            if (enemyList.entities[i]->pos.x < -150)
+            {
+                enemyList.entities[i]->type = EntityTypes::enemyInactive;
+            }
+        }
+    }
+
+    void respawnEnemies()
+    {
+
+        QueryEntitiesResult enemyList = getEntitiesByType(EntityTypes::enemyInactive);
+
+        ng::Randomizer xGenerator = {};
+        ng::Randomizer yGenerator = {};
+        xGenerator = ng::getRandomReal((float)SCREEN_WIDTH * 0.3, (float)SCREEN_WIDTH);
+        yGenerator = ng::getRandomReal(0.0f, (float)SCREEN_HEIGHT * 0.5f);
+
+        for (int i = 0; i < enemyList.count / 2; i++)
+        {
+            
+            float x = xGenerator.distribution.realD(xGenerator.generator);
+            float y = yGenerator.distribution.realD(yGenerator.generator);
+            float newXLow = x + enemyList.entities[i]->sprite.width * ng::FONT_SIZE_PIXEL;
+            xGenerator = ng::getRandomReal(newXLow, newXLow * 1.2);
+
+            enemyList.entities[i]->pos.x = x;
+            enemyList.entities[i]->pos.y = y;
+            enemyList.entities[i]->type = EntityTypes::enemy;
+        }
+
+        xGenerator = ng::getRandomReal((float)SCREEN_WIDTH * 0.3, (float)SCREEN_WIDTH);
+        yGenerator = ng::getRandomReal((float)SCREEN_HEIGHT * 0.5f, (float)SCREEN_HEIGHT);
+        for (int i = enemyList.count / 2; i < enemyList.count; i++)
+        {
+            float x = xGenerator.distribution.realD(xGenerator.generator);
+            float y = yGenerator.distribution.realD(yGenerator.generator);
+            float newXLow = x + enemyList.entities[i]->sprite.width * ng::FONT_SIZE_PIXEL;
+            xGenerator = ng::getRandomReal(newXLow, newXLow * 1.2);
+
+            enemyList.entities[i]->pos.x = x;
+            enemyList.entities[i]->pos.y = y;
+            enemyList.entities[i]->type = EntityTypes::enemy;
+        }
+    }
+
     void
     drawFrames(Renderer *renderer, Entity *entities, uint32 count)
     {
+        char line[50];
         for (uint32 i = 0; i < count; i++)
         {
             // offset because we draw with position as the middle point
@@ -407,8 +477,6 @@ namespace ng
             float offsetX = frameToDraw.width / 2;
             float offsetY = frameToDraw.height / 2;
 
-            char line[50];
-
             for (
                 uint32 y = 0; y < frameToDraw.height; y++)
             {
@@ -416,6 +484,7 @@ namespace ng
                 {
                     line[x] = frameToDraw.src[y * frameToDraw.width + x];
                 }
+                line[(uint32)frameToDraw.width] = '\0';
                 renderer->drawText(Vector2d(posToDraw.x - offsetX, posToDraw.y - ((offsetY - y) * FONT_SIZE_PIXEL)), FONT_SIZE_PIXEL, line);
             }
         }

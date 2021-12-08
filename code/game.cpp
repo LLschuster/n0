@@ -25,12 +25,25 @@ typedef uint8_t uint8;
 #include "ng_math.cpp"
 #include "engine.cpp"
 
+struct MissileManager {
+    ng::QueryEntitiesResult missileList = {};
+    uint32 currentMissile = 0;
+    uint32 shouldReloadCount = 100;
+} missileManager;
+
+
 void generateWorld()
 {
     ng::Sprite enemySprite = ng::loadSprite("EnemySprite.txt", "enemy");
     ng::Sprite heroSprite = ng::loadSprite("heroSprite.txt", "hero");
+    ng::Sprite missileSprite = ng::loadSprite("missileSprite.txt", "missile");
 
     ng::addHeroToWorld(ng::Vector2d(20, SCREEN_HEIGHT / 2), heroSprite);
+
+    for (int i = 0; i < 20; i++)
+    {
+        ng::addEntityToWorld(ng::EntityTypes::missileInactive, ng::Vector2d(), missileSprite);
+    }
 
     ng::Randomizer xGenerator = {};
     ng::Randomizer yGenerator = {};
@@ -89,7 +102,36 @@ void handleEvents()
                 {
                     ng::movePlayer(ng::MoveDirection::RIGHT);
                 }
+                if (event.key.keysym.scancode == SDL_SCANCODE_SPACE)
+                {
+                    if (missileManager.shouldReloadCount != 100) return;
+
+                    ng::launchMissile(missileManager.missileList.entities[missileManager.currentMissile]);
+                    missileManager.currentMissile++;
+
+                    if (missileManager.currentMissile >= 20)
+                    {
+                        missileManager.shouldReloadCount = 99;
+                    }
+                }
             }
+        }
+    }
+}
+
+void drawMissiles()
+{
+    for (int i=0; i < missileManager.currentMissile; i++)
+    {
+        if (strcmp(missileManager.missileList.entities[i]->type.c_str(), ng::EntityTypes::missile) == 0)
+        {
+            ng::Entity * current = missileManager.missileList.entities[i];
+            current->pos.x += current->velocity.x;
+            if (current->pos.x > SCREEN_WIDTH)
+            {
+                current->type = ng::EntityTypes::missileInactive;
+            }
+            ng::drawFrames(rd , current, 1);
         }
     }
 }
@@ -120,11 +162,36 @@ int main(int argc, char **argv)
 
     generateWorld();
 
+    // manage missiles
+    missileManager.missileList = ng::getEntitiesByType(ng::EntityTypes::missileInactive);
+
+    // reload/respawn windows
+    uint32 shouldRespawnCount = 15;
+
     while (gm->isRunning)
     {
         SDL_RenderClear(rd->renderer);
 
+        //respawns
+        if (shouldRespawnCount == 0)
+        {
+            ng::respawnEnemies();
+            shouldRespawnCount = 15;
+        }
+        shouldRespawnCount--;
+
+        if (missileManager.shouldReloadCount != 100)
+        {
+            missileManager.shouldReloadCount--;
+            if (missileManager.shouldReloadCount <=0){
+                missileManager.shouldReloadCount = 100;
+                missileManager.currentMissile = 0;
+            }
+        }
+
         //update
+        ng::moveEnemies();
+
         handleEvents();
 
         ng::QueryEntitiesResult enemyList = ng::getEntitiesByType("enemy");
@@ -132,6 +199,8 @@ int main(int argc, char **argv)
 
         //draw hero
         ng::drawFrames(rd, ng::gameMemory->hero, 1);
+
+        drawMissiles();
 
         SDL_RenderPresent(rd->renderer);
         //TODO should run atleast in 33 ms
