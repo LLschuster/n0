@@ -196,6 +196,7 @@ int main(int argc, char **argv)
 
         ng::QueryEntitiesResult enemyList = ng::getEntitiesByType("enemy");
         ng::drawFrames(rd, *enemyList.entities, enemyList.count);
+        ng::freeWorkingMemory(enemyList.freeTag);
 
         //draw hero
         ng::drawFrames(rd, ng::gameMemory->hero, 1);

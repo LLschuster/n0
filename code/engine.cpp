@@ -315,11 +315,11 @@ namespace ng
     {
         Entity **entities;
         uint32 count;
+        uint8 *freeTag;
     };
 
     GameMemory *gameMemory = {};
 
-// TODO should return index to current working memory so i can free it
     QueryEntitiesResult getEntitiesByType(const std::string &type)
     {
         QueryEntitiesResult result = {};
@@ -333,6 +333,8 @@ namespace ng
         {
             printf("Your are out of memory idiot\n");
         }
+
+        result.freeTag = gameMemory->workingMemoryCur; // use this to free the memory
 
         Entity **filteredEntities = (Entity **)gameMemory->workingMemoryCur;
         uint32 count = 0;
@@ -351,6 +353,22 @@ namespace ng
         result.entities = filteredEntities;
 
         return result;
+    }
+
+    void freeWorkingMemory(uint8 *freeTag)
+    {
+        if (gameMemory->workingMemoryCur < freeTag)
+        {
+            printf("Memory already freed, \n");
+            return;
+        }
+
+        for (uint8 *i = gameMemory->workingMemoryCur; i != freeTag; i--)
+        {
+            *i = 0;
+        }
+
+        gameMemory->workingMemoryCur = freeTag;
     }
 
     uint32 addEntityToWorld(const std::string &type, Vector2d pos, Sprite sprite, Vector2d velocity = Vector2d(10.0f, 10.0f))
@@ -423,6 +441,7 @@ namespace ng
                 enemyList.entities[i]->type = EntityTypes::enemyInactive;
             }
         }
+        freeWorkingMemory(enemyList.freeTag);
     }
 
     void respawnEnemies()
@@ -461,6 +480,8 @@ namespace ng
             enemyList.entities[i]->pos.y = y;
             enemyList.entities[i]->type = EntityTypes::enemy;
         }
+
+        freeWorkingMemory(enemyList.freeTag);
     }
 
     void
