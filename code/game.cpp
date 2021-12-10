@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <iostream>
 #include <main.h>
+#include <math.h>
+#include <algorithm>
 #include <stdint.h>
 #include <time.h>
 #include <stdarg.h>
@@ -25,12 +27,12 @@ typedef uint8_t uint8;
 #include "ng_math.cpp"
 #include "engine.cpp"
 
-struct MissileManager {
+struct MissileManager
+{
     ng::QueryEntitiesResult missileList = {};
     uint32 currentMissile = 0;
     uint32 shouldReloadCount = 100;
 } missileManager;
-
 
 void generateWorld()
 {
@@ -49,7 +51,7 @@ void generateWorld()
     ng::Randomizer yGenerator = {};
     xGenerator = ng::getRandomReal((float)SCREEN_WIDTH * 0.3, (float)SCREEN_WIDTH * 0.4f);
     yGenerator = ng::getRandomReal(0.0f, (float)SCREEN_HEIGHT * 0.5f);
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < 3; i++)
     {
         float x = xGenerator.distribution.realD(xGenerator.generator);
         float y = yGenerator.distribution.realD(yGenerator.generator);
@@ -61,7 +63,7 @@ void generateWorld()
 
     xGenerator = ng::getRandomReal((float)SCREEN_WIDTH * 0.3, (float)SCREEN_WIDTH * 0.4f);
     yGenerator = ng::getRandomReal((float)SCREEN_HEIGHT * 0.5f, (float)SCREEN_HEIGHT);
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < 3; i++)
     {
         float x = xGenerator.distribution.realD(xGenerator.generator);
         float y = yGenerator.distribution.realD(yGenerator.generator);
@@ -104,7 +106,8 @@ void handleEvents()
                 }
                 if (event.key.keysym.scancode == SDL_SCANCODE_SPACE)
                 {
-                    if (missileManager.shouldReloadCount != 100) return;
+                    if (missileManager.shouldReloadCount != 100)
+                        return;
 
                     ng::launchMissile(missileManager.missileList.entities[missileManager.currentMissile]);
                     missileManager.currentMissile++;
@@ -121,17 +124,61 @@ void handleEvents()
 
 void drawMissiles()
 {
-    for (int i=0; i < missileManager.currentMissile; i++)
+    for (int i = 0; i < missileManager.currentMissile; i++)
     {
         if (strcmp(missileManager.missileList.entities[i]->type.c_str(), ng::EntityTypes::missile) == 0)
         {
-            ng::Entity * current = missileManager.missileList.entities[i];
+            ng::Entity *current = missileManager.missileList.entities[i];
             current->pos.x += current->velocity.x;
             if (current->pos.x > SCREEN_WIDTH)
             {
                 current->type = ng::EntityTypes::missileInactive;
             }
-            ng::drawFrames(rd , current, 1);
+            ng::drawFrames(rd, current, 1);
+
+            uint32 width = ng::getEntityWidthOnDraw(rd, current);
+            ng::drawColliderBox(rd, current, 1, width);
+        }
+    }
+}
+
+//TODO
+void destroyPlayer()
+{
+    printf("you die");
+}
+
+void destroyEnemy()
+{
+}
+
+void checkColissionsFor()
+{
+    ng::QueryEntitiesResult enemyList = ng::getEntitiesByType("enemy");
+    ng::Entity *hero = ng::gameMemory->hero;
+
+    for (int i = 0; i < enemyList.count; i++)
+    {
+        if (ng::areEntitiesOverlapping(hero, enemyList.entities[i]))
+        {
+            destroyPlayer();
+        }
+    }
+
+    for (int i = 0; i < enemyList.count; i++)
+    {
+        for (int j = 0; j < missileManager.missileList.count; j++)
+        {
+            if (ng::areEntitiesOverlapping(missileManager.missileList.entities[j], enemyList.entities[i]))
+            {
+                ng::Entity *missile = missileManager.missileList.entities[j];
+                missile->type = ng::EntityTypes::missileInactive;
+
+                ng::Entity *enemy = enemyList.entities[i];
+                enemy->type = ng::EntityTypes::enemyInactive;
+
+                //TODO update game score
+            }
         }
     }
 }
@@ -170,6 +217,7 @@ int main(int argc, char **argv)
 
     while (gm->isRunning)
     {
+        SDL_SetRenderDrawColor(rd->renderer, 255, 255, 255, 255);
         SDL_RenderClear(rd->renderer);
 
         //respawns
@@ -183,7 +231,8 @@ int main(int argc, char **argv)
         if (missileManager.shouldReloadCount != 100)
         {
             missileManager.shouldReloadCount--;
-            if (missileManager.shouldReloadCount <=0){
+            if (missileManager.shouldReloadCount <= 0)
+            {
                 missileManager.shouldReloadCount = 100;
                 missileManager.currentMissile = 0;
             }
@@ -194,12 +243,19 @@ int main(int argc, char **argv)
 
         handleEvents();
 
+        checkColissionsFor();
+
+
         ng::QueryEntitiesResult enemyList = ng::getEntitiesByType("enemy");
         ng::drawFrames(rd, *enemyList.entities, enemyList.count);
+        uint32 widthEnemy = ng::getEntityWidthOnDraw(rd, *enemyList.entities);
+        ng::drawColliderBox(rd, *enemyList.entities, enemyList.count, widthEnemy);
         ng::freeWorkingMemory(enemyList.freeTag);
 
         //draw hero
         ng::drawFrames(rd, ng::gameMemory->hero, 1);
+        uint32 width = ng::getEntityWidthOnDraw(rd, ng::gameMemory->hero);
+        ng::drawColliderBox(rd, ng::gameMemory->hero, 1, width);
 
         drawMissiles();
 

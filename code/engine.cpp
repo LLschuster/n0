@@ -8,6 +8,12 @@ namespace ng
     static const uint32 FONT_SIZE_PIXEL = 16;
     static const char *DATA_PATH = "..//data//";
 
+    struct Size
+    {
+        int h;
+        int w;
+    };
+
     enum MoveDirection
     {
         UP,
@@ -213,6 +219,26 @@ namespace ng
             SDL_DestroyTexture(texture);
         }
 
+        void drawRect(float x, float y, float w, float h)
+        {
+            SDL_Rect rect = {};
+            rect.x = x;
+            rect.y = y;
+            rect.w = w;
+            rect.h = h;
+
+            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+
+            SDL_RenderDrawRect(renderer, &rect);
+        }
+
+        Size getDrawRect(const char *text)
+        {
+            Size size = {};
+            TTF_SizeText(font, text, &size.w, &size.h);
+            return size;
+        }
+
     private:
         Renderer() {}
         ~Renderer() {}
@@ -298,7 +324,9 @@ namespace ng
     struct WorldEntityList
     {
         Entity entities[100000];
+        Entity solidEntities[100000];
         uint32 entityIndex;
+        uint32 solidEntityIndex;
     };
 
     struct GameMemory
@@ -371,7 +399,7 @@ namespace ng
         gameMemory->workingMemoryCur = freeTag;
     }
 
-    uint32 addEntityToWorld(const std::string &type, Vector2d pos, Sprite sprite, Vector2d velocity = Vector2d(10.0f, 10.0f))
+    uint32 addEntityToWorld(const std::string &type, Vector2d pos, Sprite sprite, Vector2d velocity = Vector2d(10.0f, 10.0f), bool isSolid = true)
     {
         if (!gameMemory->isInit)
         {
@@ -385,6 +413,14 @@ namespace ng
         current->sprite = sprite;
         current->velocity = velocity;
         gameMemory->worldEntityList.entityIndex++;
+
+        if (isSolid)
+        {
+            uint32 solidIndex = gameMemory->worldEntityList.solidEntityIndex;
+            gameMemory->worldEntityList.solidEntities[solidIndex] = *current;
+            gameMemory->worldEntityList.solidEntityIndex++;
+        }
+
         return currentIndex;
     }
 
@@ -456,7 +492,7 @@ namespace ng
 
         for (int i = 0; i < enemyList.count / 2; i++)
         {
-            
+
             float x = xGenerator.distribution.realD(xGenerator.generator);
             float y = yGenerator.distribution.realD(yGenerator.generator);
             float newXLow = x + enemyList.entities[i]->sprite.width * ng::FONT_SIZE_PIXEL;
@@ -508,6 +544,40 @@ namespace ng
                 line[(uint32)frameToDraw.width] = '\0';
                 renderer->drawText(Vector2d(posToDraw.x - offsetX, posToDraw.y - ((offsetY - y) * FONT_SIZE_PIXEL)), FONT_SIZE_PIXEL, line);
             }
+        }
+    }
+
+    uint32
+    getEntityWidthOnDraw(Renderer *renderer, Entity *entity)
+    {
+        char line[50];
+        // offset because we draw with position as the middle point
+        Frame frameToDraw = entity->sprite.frames[0];
+        uint32 maxWidth = 0;
+
+        for (
+            uint32 y = 0; y < frameToDraw.height; y++)
+        {
+            for (uint32 x = 0; x < frameToDraw.width; x++)
+            {
+                line[x] = frameToDraw.src[y * frameToDraw.width + x];
+            }
+            line[(uint32)frameToDraw.width] = '\0';
+            Size size = renderer->getDrawRect(line);
+            maxWidth = std::max(maxWidth, (uint32)size.w);
+        }
+        return maxWidth;
+    }
+
+    void drawColliderBox(Renderer *renderer, Entity *entities, uint32 count, int width)
+    {
+        for (uint32 i = 0; i < count; i++)
+        {
+            Entity current = entities[i];
+            float x = current.pos.x; //- ((current.sprite.width / 2) * FONT_SIZE_PIXEL);
+            float y = current.pos.y - (ceil((float)(current.sprite.height) / 2) * FONT_SIZE_PIXEL);
+
+            renderer->drawRect(x, y, width, current.sprite.height * FONT_SIZE_PIXEL);
         }
     }
 
@@ -639,9 +709,55 @@ namespace ng
 
         return sprite;
     }
+
+    bool areEntitiesOverlapping(Entity *one, Entity *two)
+    {
+        bool isXOverlapping = false;
+        bool isYOverlapping = false;
+        float oneRightBound = one->pos.x + (one->sprite.width * FONT_SIZE_PIXEL) / 2;
+        float oneLeftBound = one->pos.x - (one->sprite.width * FONT_SIZE_PIXEL) / 2;
+        float oneBottomBound = one->pos.y + (one->sprite.height * FONT_SIZE_PIXEL) / 2;
+        float oneTopBound = one->pos.y - (one->sprite.height * FONT_SIZE_PIXEL) / 2;
+
+        float twoRightBound = two->pos.x + (two->sprite.width * FONT_SIZE_PIXEL) / 2;
+        float twoLeftBound = two->pos.x - (two->sprite.width * FONT_SIZE_PIXEL) / 2;
+        float twoBottomBound = two->pos.y + (two->sprite.height * FONT_SIZE_PIXEL) / 2;
+        float twoTopBound = two->pos.y - (two->sprite.height * FONT_SIZE_PIXEL) / 2;
+
+        if (oneRightBound >= twoLeftBound && oneRightBound <= twoRightBound)
+        {
+            isXOverlapping = true;
+        }
+
+        if (oneLeftBound >= twoLeftBound && oneLeftBound <= twoRightBound)
+        {
+            isXOverlapping = true;
+        }
+
+        if (oneTopBound <= twoBottomBound && oneTopBound >= twoTopBound)
+        {
+            return isYOverlapping = true;
+        }
+
+        if (oneBottomBound >= twoTopBound && oneBottomBound <= twoBottomBound)
+        {
+            return isYOverlapping = true;
+        }
+
+        return isXOverlapping && isYOverlapping;
+    }
 };
 /*
  ____ 
 \____\ 
 
+
+.
+   .
+
+0,0
+10,10
+5
+
+0 + 5 >= 10 - 5  &&
 */
