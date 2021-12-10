@@ -22,10 +22,14 @@ typedef uint8_t uint8;
 #define SCREEN_HEIGHT 780
 #define SCREEN_WIDTH 1280
 
-#include "utils.cpp"
 #include "main.h"
+#include "engine.h"
+
+#include "utils.cpp"
 #include "ng_math.cpp"
+#include "renderer.cpp"
 #include "engine.cpp"
+
 
 struct MissileManager
 {
